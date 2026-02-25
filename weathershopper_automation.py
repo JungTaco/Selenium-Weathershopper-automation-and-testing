@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 chrome_options = Options()
 chrome_options.add_argument("--headless")
 
+#Decides which page to navigate depending on temperature
 def decide_product_type(driver, temperature):
     if temperature < 25:
         moisturizer_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Buy moisturizers')]")   
@@ -42,21 +43,25 @@ def wait_for_elements(driver, by, element_identifier, timeout=5):
         return None
     return driver.find_elements(by, element_identifier)
 
+#Adds the cheapest product to the cart
 def add_to_cart(driver):
     cart_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Cart')]")
     prices = driver.find_elements(By.XPATH, "//*[contains(text(), 'Price:')]")
     add_btns = driver.find_elements(By.XPATH, "//*[contains(text(), 'Add')]")
 
+    #finds all the prices
     for i, price in enumerate(prices):
         prices[i] = int(price.text.split(" ")[-1])
+    #finds the lowest price
     for i, price in enumerate(prices):
         if prices[i] == min(prices):
             min_price_pos = i
             break
+    #clicks the "Add" button associated with the product with the lowest price to add it to the cart
     add_btns[min_price_pos].click()
     cart_btn.click()
 
-def pay(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP):
+def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP):
     pay_card_btn = wait_for_element(driver, By.XPATH, "//*[contains(text(), 'Pay with Card')]").click()
 
     iframe = wait_for_element(driver, By.CLASS_NAME, "stripe_checkout_app")
@@ -88,6 +93,7 @@ def pay(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBE
     zip_input.clear()
     zip_input.send_keys(BILLING_ZIP)
 
+def pay(driver):
     pay_card_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Pay INR')]")
     pay_card_btn.click()
 
@@ -97,6 +103,7 @@ def pay(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBE
     except TimeoutException:
         return False
 
+#Sends email containing information about the purchase
 def send_message(subject, receiver, message):
     sender = "denisaculincu96@gmail.com"
 
@@ -110,6 +117,7 @@ def send_message(subject, receiver, message):
         smtp.login(sender, "tfct jmop actj cqjb")
         smtp.send_message(msg)
 
+#Gets all the products purchased and their prices
 def get_cart_info(driver, products, prices):
     information = wait_for_elements(driver, By.TAG_NAME, "td")
     for i, info in enumerate(information):
@@ -142,14 +150,18 @@ def main():
     prices = []
     
     temperature = int(wait_for_element(driver, By.ID, "temperature").text.split(" ")[0])
+    #Decides which page to navigate depending on temperature
     decide_product_type(driver, temperature)
+    #Adds the cheapest product to the cart
     add_to_cart(driver)
 
+    #Gets all the products purchased and their prices, in order to send an information email
     get_cart_info(driver, products, prices)
 
     total = get_total(driver)
 
-    payment_success = pay(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP)
+    insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP)
+    payment_success = pay(driver)
 
     success_msg = "You have purchased the following: "
     for i, product in enumerate(products):
@@ -161,9 +173,9 @@ def main():
     failure_msg = "Your purchase has failed."
     
     if payment_success:
-        send_message("Payment successful", "denisa_culincu@yahoo.com", success_msg)
+        send_message("Payment successful", "denisaculincu96@gmail.com", success_msg)
     else:
-        send_message("Payment failed", "denisa_culincu@yahoo.com", failure_msg)
+        send_message("Payment failed", "denisaculincu96@gmail.com", failure_msg)
 
     driver.quit()
 
