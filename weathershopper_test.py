@@ -168,7 +168,6 @@ class WeatherShopperTest(unittest.TestCase):
 
     def tearDown(self):
         self.driver.close()
-        #test
 
 if __name__ == "__main__":
     unittest.main()
