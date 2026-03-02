@@ -14,16 +14,21 @@ from email.message import EmailMessage
 from dotenv import load_dotenv    
 
 chrome_options = Options()
-chrome_options.add_argument("--headless")
+#chrome_options.add_argument("--headless")
 
 #Decides which page to navigate depending on temperature
 def decide_product_type(driver, temperature):
-    if temperature < 25:
+    if temperature < 19:
         moisturizer_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Buy moisturizers')]")   
         moisturizer_btn.click()
-    else:
+        return "m"
+    elif temperature > 34:
         sunscreen_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Buy sunscreens')]")
         sunscreen_btn.click()
+        return "s"
+    else:
+        driver.quit()
+    print(page)
 
 def wait_for_element(driver, by, element_identifier, timeout=5):
     try:
@@ -43,22 +48,40 @@ def wait_for_elements(driver, by, element_identifier, timeout=5):
         return None
     return driver.find_elements(by, element_identifier)
 
-#Adds the cheapest product to the cart
-def add_to_cart(driver):
-    cart_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Cart')]")
+#Adds the cheapest product containing the specified text to cart
+def add_to_cart(driver, text):
     prices = driver.find_elements(By.XPATH, "//*[contains(text(), 'Price:')]")
     add_btns = driver.find_elements(By.XPATH, "//*[contains(text(), 'Add')]")
+    names = driver.find_elements(By.CLASS_NAME , "font-weight-bold")
+
+    min_price = -1
 
     #finds all the prices
     for i, price in enumerate(prices):
         prices[i] = int(price.text.split(" ")[-1])
     #finds the lowest price
     for i, price in enumerate(prices):
-        if prices[i] == min(prices):
-            min_price_pos = i
-            break
-    #clicks the "Add" button associated with the product with the lowest price to add it to the cart
-    add_btns[min_price_pos].click()
+        if text in names[i].text.lower():
+            if min_price > -1:
+                if prices[i] < min_price:
+                    min_price = prices[i]
+                    min_price_pos = i
+            else:
+                min_price = prices[i]
+                min_price_pos = i
+
+    if min_price > -1:
+        #clicks the "Add" button associated with the product with the lowest price to add it to the cart
+        add_btns[min_price_pos].click()
+
+def check_cart_empty(driver):
+    if wait_for_element(driver, By.ID, "cart").text == "Empty":
+        time.sleep(10)
+        print("Cart is empty)")
+        driver.quit()
+
+def go_to_cart(driver):
+    cart_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Cart')]")
     cart_btn.click()
 
 def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP):
@@ -146,17 +169,24 @@ def main():
     CARD_EXP_YEAR = int(os.getenv("CARD_EXP_YEAR"))
     BILLING_ZIP = int(os.getenv("BILLING_ZIP"))
 
-    products = []
-    prices = []
+    cart_products = []
+    cart_prices = []
     
     temperature = int(wait_for_element(driver, By.ID, "temperature").text.split(" ")[0])
     #Decides which page to navigate depending on temperature
-    decide_product_type(driver, temperature)
-    #Adds the cheapest product to the cart
-    add_to_cart(driver)
+    chosen_page = decide_product_type(driver, temperature)
+    #Adds the cheapest products to the cart
+    if chosen_page == "m":
+        add_to_cart(driver, "aloe")
+        add_to_cart(driver, "almond")
+    else:
+        add_to_cart(driver, "spf-50")
+        add_to_cart(driver, "spf-30")
+    check_cart_empty(driver)
+    go_to_cart(driver)
 
     #Gets all the products purchased and their prices, in order to send an information email
-    get_cart_info(driver, products, prices)
+    get_cart_info(driver, cart_products, cart_prices)
 
     total = get_total(driver)
 
@@ -164,9 +194,9 @@ def main():
     payment_success = pay(driver)
 
     success_msg = "You have purchased the following: "
-    for i, product in enumerate(products):
-        success_msg = success_msg + product + " (" + str(prices[i]) + " Rupees)"
-        if i != len(products) - 1:
+    for i, product in enumerate(cart_products):
+        success_msg = success_msg + product + " (" + str(cart_prices[i]) + " Rupees)"
+        if i != len(cart_products) - 1:
             success_msg = success_msg + ", "
     success_msg = success_msg + ". \nThe total of your purchase is " + str(total) + " Rupees."
 
