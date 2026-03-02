@@ -49,7 +49,7 @@ def wait_for_elements(driver, by, element_identifier, timeout=5):
     return driver.find_elements(by, element_identifier)
 
 #Adds the cheapest product containing the specified text to cart
-def add_to_cart(driver, text):
+def add_to_cart(driver, text, added_products, added_prices):
     prices = driver.find_elements(By.XPATH, "//*[contains(text(), 'Price:')]")
     add_btns = driver.find_elements(By.XPATH, "//*[contains(text(), 'Add')]")
     names = driver.find_elements(By.CLASS_NAME , "font-weight-bold")
@@ -58,7 +58,7 @@ def add_to_cart(driver, text):
 
     #finds all the prices
     for i, price in enumerate(prices):
-        prices[i] = int(price.text.split(" ")[-1])
+        prices[i] = float(price.text.split(" ")[-1])
     #finds the lowest price
     for i, price in enumerate(prices):
         if text in names[i].text.lower():
@@ -73,12 +73,22 @@ def add_to_cart(driver, text):
     if min_price > -1:
         #clicks the "Add" button associated with the product with the lowest price to add it to the cart
         add_btns[min_price_pos].click()
+        added_products.append(names[min_price_pos].text)
+        added_prices.append(float(prices[min_price_pos]))
 
 def check_cart_empty(driver):
     if wait_for_element(driver, By.ID, "cart").text == "Empty":
         time.sleep(10)
         print("Cart is empty)")
         driver.quit()
+
+#verifies if products added to cart and their prices are the same as the ones shown in the cart page
+def verify_cart(driver, added_products, added_prices, cart_products, cart_prices):
+    for i, product in enumerate(cart_products):
+        if product != added_products[i] or cart_prices[i] != added_prices[i]:
+            #exception
+            print("Cart couldn't be verified")
+            driver.quit()
 
 def go_to_cart(driver):
     cart_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Cart')]")
@@ -169,6 +179,8 @@ def main():
     CARD_EXP_YEAR = int(os.getenv("CARD_EXP_YEAR"))
     BILLING_ZIP = int(os.getenv("BILLING_ZIP"))
 
+    added_products = []
+    added_prices = []
     cart_products = []
     cart_prices = []
     
@@ -177,16 +189,19 @@ def main():
     chosen_page = decide_product_type(driver, temperature)
     #Adds the cheapest products to the cart
     if chosen_page == "m":
-        add_to_cart(driver, "aloe")
-        add_to_cart(driver, "almond")
+        add_to_cart(driver, "aloe", added_products, added_prices)
+        add_to_cart(driver, "almond", added_products, added_prices)
     else:
-        add_to_cart(driver, "spf-50")
-        add_to_cart(driver, "spf-30")
+        add_to_cart(driver, "spf-50", added_products, added_prices)
+        add_to_cart(driver, "spf-30", added_products, added_prices)
     check_cart_empty(driver)
     go_to_cart(driver)
 
     #Gets all the products purchased and their prices, in order to send an information email
     get_cart_info(driver, cart_products, cart_prices)
+
+    #verifies if products added to cart and their prices are the same as the ones shown in the cart page
+    verify_cart(driver, added_products, added_prices, cart_products, cart_prices)
 
     total = get_total(driver)
 
