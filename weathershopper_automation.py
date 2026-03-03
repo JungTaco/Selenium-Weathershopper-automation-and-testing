@@ -14,7 +14,7 @@ from email.message import EmailMessage
 from dotenv import load_dotenv    
 
 chrome_options = Options()
-#chrome_options.add_argument("--headless")
+chrome_options.add_argument("--headless")
 
 #Decides which page to navigate depending on temperature
 def decide_product_type(driver, temperature):
