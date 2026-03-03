@@ -89,7 +89,7 @@ def go_to_cart(driver):
     cart_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Cart')]")
     cart_btn.click()
 
-def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP):
+def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP):
     pay_card_btn = wait_for_element(driver, By.XPATH, "//*[contains(text(), 'Pay with Card')]").click()
 
     iframe = wait_for_element(driver, By.CLASS_NAME, "stripe_checkout_app")
@@ -101,10 +101,11 @@ def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART
 
     card_number_input = driver.find_element(By.ID, "card_number")
     card_number_input.clear()
-    card_number_input.send_keys(ACCOUNT_NUMBER_PART1)
-    card_number_input.send_keys(ACCOUNT_NUMBER_PART2)
-    card_number_input.send_keys(ACCOUNT_NUMBER_PART3)
-    card_number_input.send_keys(ACCOUNT_NUMBER_PART4)
+    card_number_input.click()
+
+    for n in ACCOUNT_NUMBER:
+        card_number_input.send_keys(n)
+        time.sleep(0.3)
 
     cc_exp_input = driver.find_element(By.ID, "cc-exp")
     cc_exp_input.clear()
@@ -165,11 +166,7 @@ def main():
 
     load_dotenv()
     EMAIL = os.getenv("EMAIL")
-    ACCOUNT_NUMBER = int(os.getenv("ACCOUNT_NUMBER"))
-    ACCOUNT_NUMBER_PART1 = int(os.getenv("ACCOUNT_NUMBER_PART1"))
-    ACCOUNT_NUMBER_PART2 = int(os.getenv("ACCOUNT_NUMBER_PART2"))
-    ACCOUNT_NUMBER_PART3 = int(os.getenv("ACCOUNT_NUMBER_PART3"))
-    ACCOUNT_NUMBER_PART4 = int(os.getenv("ACCOUNT_NUMBER_PART4"))
+    ACCOUNT_NUMBER = os.getenv("ACCOUNT_NUMBER")
     CVC = int(os.getenv("CVC"))
     CARD_EXP_MONTH = int(os.getenv("CARD_EXP_MONTH"))
     CARD_EXP_YEAR = int(os.getenv("CARD_EXP_YEAR"))
@@ -198,10 +195,8 @@ def main():
 
     #verifies if products added to cart and their prices are the same as the ones shown in the cart page
     verify_cart(driver, added_products, added_prices, cart_products, cart_prices)
-
     total = get_total(driver)
-
-    insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP)
+    insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP)
     payment_success = pay(driver)
 
     success_msg = "You have purchased the following: "
