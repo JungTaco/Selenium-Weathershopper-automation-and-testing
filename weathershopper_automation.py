@@ -76,7 +76,7 @@ def add_to_cart(driver, text, added_products, added_prices):
         added_prices.append(float(prices[min_price_pos]))
 
 def check_cart_empty(driver):
-    if wait_for_element(driver, By.ID, "cart").text != "Empty":
+    if wait_for_element(driver, By.ID, "cart").text == "Empty":
         raise NameError('Cart is empty')
 
 #verifies if products added to cart and their prices are the same as the ones shown in the cart page
@@ -165,6 +165,7 @@ def main():
 
     load_dotenv()
     EMAIL = os.getenv("EMAIL")
+    ACCOUNT_NUMBER = int(os.getenv("ACCOUNT_NUMBER"))
     ACCOUNT_NUMBER_PART1 = int(os.getenv("ACCOUNT_NUMBER_PART1"))
     ACCOUNT_NUMBER_PART2 = int(os.getenv("ACCOUNT_NUMBER_PART2"))
     ACCOUNT_NUMBER_PART3 = int(os.getenv("ACCOUNT_NUMBER_PART3"))
