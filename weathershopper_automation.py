@@ -28,7 +28,6 @@ def decide_product_type(driver, temperature):
         return "s"
     else:
         driver.quit()
-    print(page)
 
 def wait_for_element(driver, by, element_identifier, timeout=5):
     try:
@@ -77,18 +76,14 @@ def add_to_cart(driver, text, added_products, added_prices):
         added_prices.append(float(prices[min_price_pos]))
 
 def check_cart_empty(driver):
-    if wait_for_element(driver, By.ID, "cart").text == "Empty":
-        time.sleep(10)
-        print("Cart is empty)")
-        driver.quit()
+    if wait_for_element(driver, By.ID, "cart").text != "Empty":
+        raise NameError('Cart is empty')
 
 #verifies if products added to cart and their prices are the same as the ones shown in the cart page
 def verify_cart(driver, added_products, added_prices, cart_products, cart_prices):
     for i, product in enumerate(cart_products):
         if product != added_products[i] or cart_prices[i] != added_prices[i]:
-            #exception
-            print("Cart couldn't be verified")
-            driver.quit()
+            raise NameError("Cart couldn't be verified")
 
 def go_to_cart(driver):
     cart_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Cart')]")
