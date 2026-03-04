@@ -27,6 +27,7 @@ def decide_product_type(driver, temperature):
         sunscreen_btn.click()
         return "s"
     else:
+        print("Temperature between 19 and 34")
         driver.quit()
 
 def wait_for_element(driver, by, element_identifier, timeout=5):
@@ -133,7 +134,7 @@ def pay(driver):
         return False
 
 #Sends email containing information about the purchase
-def send_message(subject, receiver, message):
+def send_message(subject, receiver, message, password):
     sender = "denisaculincu96@gmail.com"
 
     msg = EmailMessage()
@@ -143,10 +144,10 @@ def send_message(subject, receiver, message):
     msg.set_content(message)
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(sender, "tfct jmop actj cqjb")
+        smtp.login(sender, password)
         smtp.send_message(msg)
 
-#Gets all the products purchased and their prices
+#Gets all the products displayed in cart and their prices
 def get_cart_info(driver, products, prices):
     information = wait_for_elements(driver, By.TAG_NAME, "td")
     for i, info in enumerate(information):
@@ -164,6 +165,7 @@ def main():
 
     driver.get("https://weathershopper.pythonanywhere.com/")
 
+    #loads billing information
     load_dotenv()
     EMAIL = os.getenv("EMAIL")
     ACCOUNT_NUMBER = os.getenv("ACCOUNT_NUMBER")
@@ -171,28 +173,33 @@ def main():
     CARD_EXP_MONTH = int(os.getenv("CARD_EXP_MONTH"))
     CARD_EXP_YEAR = int(os.getenv("CARD_EXP_YEAR"))
     BILLING_ZIP = int(os.getenv("BILLING_ZIP"))
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 
+    #keeps track of products added to cart
     added_products = []
+    #keeps track of prices of products added to cart
     added_prices = []
+    #products that show in cart
     cart_products = []
+    #prices of products that show in cart
     cart_prices = []
     
+    #gets temperature
     temperature = int(wait_for_element(driver, By.ID, "temperature").text.split(" ")[0])
     #Decides which page to navigate depending on temperature
     chosen_page = decide_product_type(driver, temperature)
-    #Adds the cheapest products to the cart
+    #Adds the cheapest products to the cart, depending on the page navigated to
     if chosen_page == "m":
         add_to_cart(driver, "aloe", added_products, added_prices)
         add_to_cart(driver, "almond", added_products, added_prices)
     else:
         add_to_cart(driver, "spf-50", added_products, added_prices)
         add_to_cart(driver, "spf-30", added_products, added_prices)
+    
     check_cart_empty(driver)
     go_to_cart(driver)
-
     #Gets all the products purchased and their prices, in order to send an information email
     get_cart_info(driver, cart_products, cart_prices)
-
     #verifies if products added to cart and their prices are the same as the ones shown in the cart page
     verify_cart(driver, added_products, added_prices, cart_products, cart_prices)
     total = get_total(driver)
@@ -209,9 +216,9 @@ def main():
     failure_msg = "Your purchase has failed."
     
     if payment_success:
-        send_message("Payment successful", "denisaculincu96@gmail.com", success_msg)
+        send_message("Payment successful", "denisaculincu96@gmail.com", success_msg, MAIL_PASSWORD)
     else:
-        send_message("Payment failed", "denisaculincu96@gmail.com", failure_msg)
+        send_message("Payment failed", "denisaculincu96@gmail.com", failure_msg, MAIL_PASSWORD)
 
     driver.quit()
 
