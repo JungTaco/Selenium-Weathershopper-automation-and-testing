@@ -22,7 +22,7 @@ def check_correct_title(self, driver, text):
 
 #Decides which page to navigate depending on temperature
 def decide_product_type(driver, temperature, self):
-    if temperature < 25:
+    if temperature < 19:
         moisturizer_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Buy moisturizers')]")   
         moisturizer_btn.click()
         if check_correct_title(self, driver, "Moisturizers"):
@@ -31,7 +31,7 @@ def decide_product_type(driver, temperature, self):
         else:
             print("Failure")
             return False
-    else:
+    elif temperature > 34:
         sunscreen_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Buy sunscreens')]")
         sunscreen_btn.click()
         if check_correct_title(self, driver, "Sunscreens"):
@@ -40,6 +40,16 @@ def decide_product_type(driver, temperature, self):
         else:
             print("Failure")
             return False
+    else:
+        driver.quit()
+
+def check_product_page(driver):
+    if "Moisturizers" in driver.title:
+        return "m"
+    elif "Sunscreens" in driver.title:
+        return "s"
+    else:
+        raise NameError('Not on products page')
 
 def wait_for_element(driver, by, element_identifier, timeout=5):
     try:
@@ -59,25 +69,49 @@ def wait_for_elements(driver, by, element_identifier, timeout=5):
         return None
     return driver.find_elements(by, element_identifier)
 
-#Adds the cheapest product to the cart
-def add_to_cart(driver):
-    cart_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Cart')]")
+#Adds the cheapest product containing the specified text to cart
+def add_to_cart(driver, text, added_products, added_prices):
     prices = driver.find_elements(By.XPATH, "//*[contains(text(), 'Price:')]")
     add_btns = driver.find_elements(By.XPATH, "//*[contains(text(), 'Add')]")
+    names = driver.find_elements(By.CLASS_NAME , "font-weight-bold")
+
+    min_price = -1
 
     #finds all the prices
     for i, price in enumerate(prices):
-        prices[i] = int(price.text.split(" ")[-1])
+        prices[i] = float(price.text.split(" ")[-1])
     #finds the lowest price
     for i, price in enumerate(prices):
-        if prices[i] == min(prices):
-            min_price_pos = i
-            break
-    #clicks the "Add" button associated with the product with the lowest price to add it to the cart
-    add_btns[min_price_pos].click()
+        if text in names[i].text.lower():
+            if min_price > -1:
+                if prices[i] < min_price:
+                    min_price = prices[i]
+                    min_price_pos = i
+            else:
+                min_price = prices[i]
+                min_price_pos = i
+
+    if min_price > -1:
+        #clicks the "Add" button associated with the product with the lowest price to add it to the cart
+        add_btns[min_price_pos].click()
+        added_products.append(names[min_price_pos].text)
+        added_prices.append(float(prices[min_price_pos]))
+
+def check_cart_empty(driver):
+    if wait_for_element(driver, By.ID, "cart").text == "Empty":
+        raise NameError('Cart is empty')
+
+#verifies if products added to cart and their prices are the same as the ones shown in the cart page
+def verify_cart(driver, added_products, added_prices, cart_products, cart_prices):
+    for i, product in enumerate(cart_products):
+        if product != added_products[i] or cart_prices[i] != added_prices[i]:
+            raise NameError("Cart couldn't be verified")
+
+def go_to_cart(driver):
+    cart_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Cart')]")
     cart_btn.click()
 
-def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP):
+def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP):
     pay_card_btn = wait_for_element(driver, By.XPATH, "//*[contains(text(), 'Pay with Card')]").click()
 
     iframe = wait_for_element(driver, By.CLASS_NAME, "stripe_checkout_app")
@@ -89,10 +123,11 @@ def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART
 
     card_number_input = driver.find_element(By.ID, "card_number")
     card_number_input.clear()
-    card_number_input.send_keys(ACCOUNT_NUMBER_PART1)
-    card_number_input.send_keys(ACCOUNT_NUMBER_PART2)
-    card_number_input.send_keys(ACCOUNT_NUMBER_PART3)
-    card_number_input.send_keys(ACCOUNT_NUMBER_PART4)
+    card_number_input.click()
+
+    for n in ACCOUNT_NUMBER:
+        card_number_input.send_keys(n)
+        time.sleep(0.3)
 
     cc_exp_input = driver.find_element(By.ID, "cc-exp")
     cc_exp_input.clear()
@@ -108,6 +143,15 @@ def insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART
     zip_input =  wait_for_element(driver, By.ID, "billing-zip", 50)
     zip_input.clear()
     zip_input.send_keys(BILLING_ZIP)
+
+#Gets all the products displayed in cart and their prices
+def get_cart_info(driver, products, prices):
+    information = wait_for_elements(driver, By.TAG_NAME, "td")
+    for i, info in enumerate(information):
+        if i%2 == 0:
+            products.append(info.text)
+        else:
+            prices.append(float(info.text))
 
 def pay(driver):
     pay_card_btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Pay INR')]")
@@ -139,20 +183,40 @@ class WeatherShopperTest(unittest.TestCase):
 
         load_dotenv()
         EMAIL = os.getenv("EMAIL")
-        ACCOUNT_NUMBER_PART1 = int(os.getenv("ACCOUNT_NUMBER_PART1"))
-        ACCOUNT_NUMBER_PART2 = int(os.getenv("ACCOUNT_NUMBER_PART2"))
-        ACCOUNT_NUMBER_PART3 = int(os.getenv("ACCOUNT_NUMBER_PART3"))
-        ACCOUNT_NUMBER_PART4 = int(os.getenv("ACCOUNT_NUMBER_PART4"))
+        ACCOUNT_NUMBER = os.getenv("ACCOUNT_NUMBER")
         CVC = int(os.getenv("CVC"))
         CARD_EXP_MONTH = int(os.getenv("CARD_EXP_MONTH"))
         CARD_EXP_YEAR = int(os.getenv("CARD_EXP_YEAR"))
         BILLING_ZIP = int(os.getenv("BILLING_ZIP"))
         
+        #keeps track of products added to cart
+        added_products = []
+        #keeps track of prices of products added to cart
+        added_prices = []
+        #products that show in cart
+        cart_products = []
+        #prices of products that show in cart
+        cart_prices = []
+
         temperature = int(wait_for_element(driver, By.ID, "temperature").text.split(" ")[0])
         decide_product_type(driver, temperature, self)
-        add_to_cart(driver)
+        
+        chosen_page = check_product_page(driver)
+        #Adds the cheapest products to the cart, depending on the page navigated to
+        if chosen_page == "m":
+            add_to_cart(driver, "aloe", added_products, added_prices)
+            add_to_cart(driver, "almond", added_products, added_prices)
+        else:
+            add_to_cart(driver, "spf-50", added_products, added_prices)
+            add_to_cart(driver, "spf-30", added_products, added_prices)
 
-        insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER_PART1, ACCOUNT_NUMBER_PART2, ACCOUNT_NUMBER_PART3, ACCOUNT_NUMBER_PART4, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP)
+        check_cart_empty(driver)
+        go_to_cart(driver)
+        #Gets all the products purchased and their prices, in order verify cart
+        get_cart_info(driver, cart_products, cart_prices)
+        #verifies if products added to cart and their prices are the same as the ones shown in the cart page
+        verify_cart(driver, added_products, added_prices, cart_products, cart_prices)
+        insert_payment_info(driver, EMAIL, ACCOUNT_NUMBER, CVC, CARD_EXP_MONTH, CARD_EXP_YEAR, BILLING_ZIP)
         payment_success = pay(driver)
         assert payment_success
 
